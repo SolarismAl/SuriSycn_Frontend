@@ -186,14 +186,14 @@ export default function LoginPage() {
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-blue-900/90 to-blue-900/50 dark:from-slate-950/90 dark:to-slate-950/50" />
         
         <div className="relative z-10 max-w-xl">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center p-2 mb-8 shadow-lg">
+          {/* <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center p-2 mb-8 shadow-lg">
             <Image src="/images/surigao-logo.png" alt="Surigao City Logo" width={80} height={80} className="object-contain" />
-          </div>
+          </div> */}
           <div className="text-sm font-bold tracking-widest text-blue-300 uppercase mb-3">
             Republic of the Philippines
           </div>
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-6">
-            City Government of Surigao
+            City Government of Blank
           </h1>
           <h2 className="text-2xl font-medium text-blue-100 mb-6">
             Centralized Resource & Workflow Portal

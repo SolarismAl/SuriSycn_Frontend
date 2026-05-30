@@ -14,6 +14,7 @@ import {
   FileText,
   Settings,
   LogOut,
+  BarChart,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { api } from "@/lib/axios";
@@ -62,6 +63,12 @@ const allNavItems: NavItem[] = [
   //   href: "/dashboard/documents",
   //   roles: ["admin", "manager"],
   // },
+  {
+    icon: BarChart,
+    label: "Reports",
+    href: "/dashboard/reports",
+    roles: ["admin", "manager"],
+  },
   {
     icon: Settings,
     label: "Settings",
