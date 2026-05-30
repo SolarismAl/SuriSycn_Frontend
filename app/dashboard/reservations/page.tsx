@@ -31,6 +31,9 @@ import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { format, parseISO, isToday, isTomorrow } from "date-fns";
 import { useAuthStore } from "@/store/auth-store";
+import dynamic from "next/dynamic";
+
+const CalendarModal = dynamic(() => import("./calendar-modal"), { ssr: false });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,12 +98,14 @@ interface ReservationFormModalProps {
   onClose: () => void;
   onSaved: () => void;
   editing?: Reservation | null;
+  reservations: Reservation[];
 }
 
-function ReservationFormModal({ open, onClose, onSaved, editing }: ReservationFormModalProps) {
+function ReservationFormModal({ open, onClose, onSaved, editing, reservations }: ReservationFormModalProps) {
   const isEdit = !!editing;
 
   const [roomName, setRoomName] = useState("");
+  const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -110,10 +115,14 @@ function ReservationFormModal({ open, onClose, onSaved, editing }: ReservationFo
   useEffect(() => {
     if (editing) {
       setRoomName(editing.room_name);
-      setStartTime(formatDatetimeLocal(editing.start_time));
-      setEndTime(formatDatetimeLocal(editing.end_time));
+      const startStr = formatDatetimeLocal(editing.start_time);
+      const endStr = formatDatetimeLocal(editing.end_time);
+      setDate(startStr.split("T")[0]);
+      setStartTime(startStr.split("T")[1]);
+      setEndTime(endStr.split("T")[1]);
     } else {
       setRoomName("");
+      setDate("");
       setStartTime("");
       setEndTime("");
     }
@@ -123,10 +132,38 @@ function ReservationFormModal({ open, onClose, onSaved, editing }: ReservationFo
   function validate() {
     const e: Record<string, string> = {};
     if (!roomName.trim()) e.room_name = "Room name is required";
+    if (!date) e.date = "Date is required";
     if (!startTime) e.start_time = "Start time is required";
     if (!endTime) e.end_time = "End time is required";
-    if (startTime && endTime && endTime <= startTime)
+    if (startTime && endTime && endTime <= startTime) {
       e.end_time = "End time must be after start time";
+    }
+    
+    if (roomName && date && startTime && endTime && endTime > startTime) {
+      const selectedStart = new Date(`${date}T${startTime}`).getTime();
+      const selectedEnd = new Date(`${date}T${endTime}`).getTime();
+      const now = new Date().getTime();
+      
+      if (selectedStart <= now) {
+        e.start_time = "Start time must be in the future";
+      } else {
+        const conflict = reservations.find((r) => {
+          if (r.status === "rejected") return false;
+          if (r.room_name !== roomName) return false;
+          if (isEdit && editing && r.id === editing.id) return false;
+          
+          const rStart = new Date(r.start_time).getTime();
+          const rEnd = new Date(r.end_time).getTime();
+          
+          return selectedStart < rEnd && selectedEnd > rStart;
+        });
+
+        if (conflict) {
+          e.general = "This room is already booked for the selected time.";
+        }
+      }
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -138,8 +175,8 @@ function ReservationFormModal({ open, onClose, onSaved, editing }: ReservationFo
     try {
       const payload = {
         room_name: roomName.trim(),
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString(),
+        start_time: new Date(`${date}T${startTime}`).toISOString(),
+        end_time: new Date(`${date}T${endTime}`).toISOString(),
       };
 
       if (isEdit && editing) {
@@ -169,52 +206,81 @@ function ReservationFormModal({ open, onClose, onSaved, editing }: ReservationFo
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
+          {errors.general && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-500/10 dark:text-red-400 rounded-md border border-red-200 dark:border-red-500/20">
+              {errors.general}
+            </div>
+          )}
+
           {/* Room Name */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="room_name">Room Name</Label>
-            <Input
+            <select
               id="room_name"
-              placeholder="e.g. Executive Boardroom"
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
               aria-invalid={!!errors.room_name}
-              className="h-9"
-            />
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="" disabled>Select a room</option>
+              <option value="Banahao">Banahao</option>
+              <option value="Espina">Espina</option>
+              <option value="Sen. Barbers Hall">Sen. Barbers Hall</option>
+              <option value="Gemina">Gemina</option>
+            </select>
             {errors.room_name && (
               <span className="text-xs text-destructive">{errors.room_name}</span>
             )}
           </div>
 
-          {/* Start Time */}
+          {/* Date */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="start_time">Start Time</Label>
+            <Label htmlFor="date">Date</Label>
             <Input
-              id="start_time"
-              type="datetime-local"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              aria-invalid={!!errors.start_time}
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              aria-invalid={!!errors.date}
               className="h-9"
             />
-            {errors.start_time && (
-              <span className="text-xs text-destructive">{errors.start_time}</span>
+            {errors.date && (
+              <span className="text-xs text-destructive">{errors.date}</span>
             )}
           </div>
 
-          {/* End Time */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="end_time">End Time</Label>
-            <Input
-              id="end_time"
-              type="datetime-local"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              aria-invalid={!!errors.end_time}
-              className="h-9"
-            />
-            {errors.end_time && (
-              <span className="text-xs text-destructive">{errors.end_time}</span>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Start Time */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="start_time">Start Time</Label>
+              <Input
+                id="start_time"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                aria-invalid={!!errors.start_time}
+                className="h-9"
+              />
+              {errors.start_time && (
+                <span className="text-xs text-destructive">{errors.start_time}</span>
+              )}
+            </div>
+
+            {/* End Time */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="end_time">End Time</Label>
+              <Input
+                id="end_time"
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                aria-invalid={!!errors.end_time}
+                className="h-9"
+              />
+              {errors.end_time && (
+                <span className="text-xs text-destructive">{errors.end_time}</span>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="mt-2">
@@ -235,6 +301,8 @@ function ReservationFormModal({ open, onClose, onSaved, editing }: ReservationFo
     </Dialog>
   );
 }
+
+
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
@@ -426,6 +494,7 @@ export default function ReservationsPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
   const [bookOpen, setBookOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Reservation | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Reservation | null>(null);
 
@@ -517,6 +586,15 @@ export default function ReservationsPage() {
             className="gap-1.5 rounded-xl"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button
+            id="calendar-view-btn"
+            variant="outline"
+            onClick={() => setCalendarOpen(true)}
+            className="gap-2 rounded-xl"
+          >
+            <Calendar className="w-4 h-4" />
+            View Calendar
           </Button>
           <Button
             id="book-room-btn"
@@ -673,18 +751,25 @@ export default function ReservationsPage() {
         open={bookOpen}
         onClose={() => setBookOpen(false)}
         onSaved={fetchReservations}
+        reservations={reservations}
       />
       <ReservationFormModal
         open={!!editTarget}
         editing={editTarget}
         onClose={() => setEditTarget(null)}
         onSaved={fetchReservations}
+        reservations={reservations}
       />
       <DeleteConfirmModal
         open={!!deleteTarget}
         reservation={deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onDeleted={fetchReservations}
+      />
+      <CalendarModal
+        open={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+        reservations={reservations}
       />
     </div>
   );

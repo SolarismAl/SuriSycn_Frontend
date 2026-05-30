@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
-import { Plus } from "lucide-react";
+import { Plus, Edit2, Trash2 } from "lucide-react";
 
 // --- Skeleton helpers ---
 function SkeletonBlock({ className }: { className?: string }) {
@@ -93,29 +93,78 @@ export default function DashboardPage() {
   const { user } = useAuthStore();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<number | string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<number | string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAddAnnouncement = async () => {
+  const resetAnnouncementForm = () => {
+    setEditingAnnouncementId(null);
+    setNewTitle("");
+    setNewContent("");
+  };
+
+  const handleOpenNewAnnouncement = () => {
+    resetAnnouncementForm();
+    setIsModalOpen(true);
+  };
+
+  const handleEditAnnouncement = (ann: any) => {
+    setEditingAnnouncementId(ann.id);
+    setNewTitle(ann.title);
+    setNewContent(ann.content || "");
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteAnnouncementClick = (id: number | string) => {
+    setDeletingAnnouncementId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingAnnouncementId) return;
+    try {
+      setIsSubmitting(true);
+      await api.delete(`/announcements/${deletingAnnouncementId}`);
+      toast.success("Announcement deleted!");
+      setIsDeleteDialogOpen(false);
+      setDeletingAnnouncementId(null);
+      refetch();
+    } catch (err) {
+      toast.error("Failed to delete announcement");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveAnnouncement = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
       toast.error("Title and content are required");
       return;
     }
     try {
       setIsSubmitting(true);
-      await api.post("/announcements", {
-        title: newTitle,
-        content: newContent,
-        published_at: new Date().toISOString()
-      });
-      toast.success("Announcement posted!");
+      if (editingAnnouncementId) {
+        await api.put(`/announcements/${editingAnnouncementId}`, {
+          title: newTitle,
+          content: newContent,
+        });
+        toast.success("Announcement updated!");
+      } else {
+        await api.post("/announcements", {
+          title: newTitle,
+          content: newContent,
+          published_at: new Date().toISOString()
+        });
+        toast.success("Announcement posted!");
+      }
       setIsModalOpen(false);
-      setNewTitle("");
-      setNewContent("");
+      resetAnnouncementForm();
       refetch();
     } catch (err) {
-      toast.error("Failed to post announcement");
+      toast.error(editingAnnouncementId ? "Failed to update announcement" : "Failed to post announcement");
     } finally {
       setIsSubmitting(false);
     }
@@ -374,7 +423,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center mb-5">
               <h3 className="font-semibold text-lg tracking-tight">Announcements</h3>
               {user?.role === "admin" && (
-                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)} className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/10">
+                <Button variant="ghost" size="icon" onClick={handleOpenNewAnnouncement} className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/10">
                   <Plus className="w-4 h-4" />
                 </Button>
               )}
@@ -398,16 +447,34 @@ export default function DashboardPage() {
                 data?.announcements.map((item) => {
                   const priority = getAnnouncementPriority(item.published_at);
                   return (
-                    <div key={item.id} className="flex gap-4 items-start">
+                    <div key={item.id} className="flex gap-4 items-start group">
                       <div
                         className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${getPriorityColor(priority)}`}
                       />
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 flex-1">
                         <span className="text-sm font-medium leading-tight">{item.title}</span>
                         <span className="text-xs text-muted-foreground">
                           {formatRelativeDate(item.published_at ?? item.created_at)}
                         </span>
                       </div>
+                      {user?.role === "admin" && (
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                          <button
+                            onClick={() => handleEditAnnouncement(item)}
+                            className="p-1 text-muted-foreground hover:text-blue-500 rounded"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAnnouncementClick(item.id)}
+                            className="p-1 text-muted-foreground hover:text-red-500 rounded"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -476,10 +543,10 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) resetAnnouncementForm(); setIsModalOpen(open); }}>
         <DialogContent className="sm:max-w-[425px] rounded-2xl border-black/5 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-3xl">
           <DialogHeader>
-            <DialogTitle>New Announcement</DialogTitle>
+            <DialogTitle>{editingAnnouncementId ? "Edit Announcement" : "New Announcement"}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
             <div className="flex flex-col gap-2">
@@ -504,9 +571,26 @@ export default function DashboardPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting} className="rounded-xl">Cancel</Button>
-            <Button onClick={handleAddAnnouncement} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-              {isSubmitting ? "Posting..." : "Post Announcement"}
+            <Button variant="outline" onClick={() => { setIsModalOpen(false); resetAnnouncementForm(); }} disabled={isSubmitting} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleSaveAnnouncement} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+              {isSubmitting ? (editingAnnouncementId ? "Updating..." : "Posting...") : (editingAnnouncementId ? "Update Announcement" : "Post Announcement")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] rounded-2xl border-black/5 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-3xl">
+          <DialogHeader>
+            <DialogTitle>Delete Announcement</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-muted-foreground">
+            Are you sure you want to delete this announcement? This action cannot be undone.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isSubmitting} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleConfirmDelete} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white rounded-xl">
+              {isSubmitting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

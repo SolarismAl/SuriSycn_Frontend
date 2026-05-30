@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskNumber, setEditingTaskNumber] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("low");
@@ -52,6 +54,28 @@ export default function TasksPage() {
     }
   };
 
+  const resetForm = () => {
+    setEditingTaskId(null);
+    setEditingTaskNumber(null);
+    setNewTaskTitle("");
+    setNewTaskDesc("");
+    setNewTaskPriority("low");
+    setNewTaskDate("");
+    setNewTaskAssignedTo("");
+    setIsModalOpen(false);
+  };
+
+  const handleEditTask = (task: any) => {
+    setEditingTaskId(task.id);
+    setEditingTaskNumber(task.task_number || null);
+    setNewTaskTitle(task.title || "");
+    setNewTaskDesc(task.description || "");
+    setNewTaskPriority(task.priority || "low");
+    setNewTaskDate(task.due_date ? new Date(task.due_date).toISOString().split("T")[0] : "");
+    setNewTaskAssignedTo(task.assigned_to || "");
+    setIsModalOpen(true);
+  };
+
   const handleSaveTask = async () => {
     if (!newTaskTitle) {
       toast.error("Title is required");
@@ -65,21 +89,25 @@ export default function TasksPage() {
         priority: newTaskPriority,
         due_date: newTaskDate || null,
         assigned_to: newTaskAssignedTo || null,
-        status: "pending",
       };
-      const res = await api.post("/tasks", payload);
-      if (res.data?.status === "success") {
-        setTasks([...tasks, res.data.data]);
-        setIsModalOpen(false);
-        setNewTaskTitle("");
-        setNewTaskDesc("");
-        setNewTaskPriority("low");
-        setNewTaskDate("");
-        setNewTaskAssignedTo("");
-        toast.success("Task created successfully!");
+
+      if (editingTaskId) {
+        const res = await api.put(`/tasks/${editingTaskId}`, payload);
+        if (res.data?.status === "success") {
+          setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...payload, assigned_to: payload.assigned_to } : t));
+          resetForm();
+          toast.success("Task updated successfully!");
+        }
+      } else {
+        const res = await api.post("/tasks", { ...payload, status: "pending" });
+        if (res.data?.status === "success") {
+          setTasks([...tasks, res.data.data]);
+          resetForm();
+          toast.success("Task created successfully!");
+        }
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to create task");
+      toast.error(error.response?.data?.message || "Failed to save task");
     } finally {
       setIsSubmitting(false);
     }
@@ -146,7 +174,7 @@ export default function TasksPage() {
           transition={{ duration: 0.3, delay: 0.2 }}
         >
           <Button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
             className="rounded-xl shadow-md bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
           >
             <Plus className="w-4 h-4" />
@@ -168,12 +196,12 @@ export default function TasksPage() {
               <span className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">To Do</span>
               <Badge variant="secondary" className="rounded-full px-2 py-0 h-5 text-xs bg-black/10 dark:bg-white/10">{todoTasks.length}</Badge>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(true)} className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10"><Plus className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => { resetForm(); setIsModalOpen(true); }} className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10"><Plus className="w-4 h-4" /></Button>
           </div>
           <div className="flex flex-col gap-3 flex-1">
             {todoTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<AlertCircle className="w-4 h-4 text-orange-500" />} />
+                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<AlertCircle className="w-4 h-4 text-orange-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
             ))}
           </div>
@@ -194,7 +222,7 @@ export default function TasksPage() {
           <div className="flex flex-col gap-3 flex-1">
             {inProgressTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 + 0.2 }}>
-                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<Clock className="w-4 h-4 text-blue-500" />} />
+                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<Clock className="w-4 h-4 text-blue-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
             ))}
           </div>
@@ -215,7 +243,7 @@ export default function TasksPage() {
           <div className="flex flex-col gap-3 flex-1">
             {inReviewTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 + 0.3 }}>
-                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<Clock className="w-4 h-4 text-purple-500" />} />
+                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<Clock className="w-4 h-4 text-purple-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
             ))}
           </div>
@@ -236,19 +264,23 @@ export default function TasksPage() {
           <div className="flex flex-col gap-3 flex-1">
             {doneTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 + 0.4 }}>
-                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} />
+                <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
             ))}
           </div>
         </div>
       </div>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) resetForm(); else setIsModalOpen(true); }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Add New Task</DialogTitle>
+            <DialogTitle>
+              {editingTaskId 
+                ? `Edit Task ${editingTaskNumber ? `(${editingTaskNumber})` : ''}` 
+                : "Add New Task"}
+            </DialogTitle>
             <DialogDescription>
-              Create a new task and add it to your board.
+              {editingTaskId ? "Update the details of your task." : "Create a new task and add it to your board."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -278,7 +310,7 @@ export default function TasksPage() {
                 id="priority"
                 value={newTaskPriority}
                 onChange={(e) => setNewTaskPriority(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 col-span-3"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 col-span-3"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -301,7 +333,7 @@ export default function TasksPage() {
                 id="assigned_to"
                 value={newTaskAssignedTo}
                 onChange={(e) => setNewTaskAssignedTo(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 col-span-3"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 col-span-3"
               >
                 <option value="">Unassigned</option>
                 {users.map((u) => (
@@ -311,7 +343,7 @@ export default function TasksPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>Cancel</Button>
             <Button onClick={handleSaveTask} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               {isSubmitting ? "Saving Task..." : "Save Task"}
             </Button>
@@ -322,7 +354,7 @@ export default function TasksPage() {
   );
 }
 
-function TaskCard({ task, priorityColor, icon, users }: { task: any, priorityColor: string, icon: React.ReactNode, users: any[] }) {
+function TaskCard({ task, priorityColor, icon, users, onClick }: { task: any, priorityColor: string, icon: React.ReactNode, users: any[], onClick?: () => void }) {
   const getInitials = (userId: string) => {
     if (!userId) return "??";
     const user = users.find(u => u.id === userId);
@@ -335,11 +367,12 @@ function TaskCard({ task, priorityColor, icon, users }: { task: any, priorityCol
 
   return (
     <Card 
+      onClick={onClick}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("taskId", task.id);
       }}
-      className="p-4 border-black/5 dark:border-white/10 bg-white/60 dark:bg-black/40 backdrop-blur-3xl shadow-sm rounded-2xl hover:shadow-md transition-all cursor-grab active:cursor-grabbing group"
+      className="p-4 border-black/5 dark:border-white/10 bg-white/60 dark:bg-black/40 backdrop-blur-3xl shadow-sm rounded-2xl hover:shadow-md transition-all cursor-grab active:cursor-grabbing group cursor-pointer"
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex gap-2 items-center">
