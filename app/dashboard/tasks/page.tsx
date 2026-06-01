@@ -24,6 +24,7 @@ export default function TasksPage() {
   const [newTaskDate, setNewTaskDate] = useState("");
   const [newTaskAssignedTo, setNewTaskAssignedTo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function TasksPage() {
   };
 
   const fetchTasks = async () => {
+    setIsLoading(true);
     try {
       const res = await api.get("/tasks");
       if (res.data?.status === "success") {
@@ -51,6 +53,8 @@ export default function TasksPage() {
       }
     } catch (error) {
       console.error("Failed to fetch tasks", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -199,7 +203,12 @@ export default function TasksPage() {
             <Button variant="ghost" size="icon" onClick={() => { resetForm(); setIsModalOpen(true); }} className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10"><Plus className="w-4 h-4" /></Button>
           </div>
           <div className="flex flex-col gap-3 flex-1">
-            {todoTasks.map((task, i) => (
+            {isLoading ? (
+              <>
+                <TaskSkeleton />
+                <TaskSkeleton />
+              </>
+            ) : todoTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
                 <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<AlertCircle className="w-4 h-4 text-orange-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
@@ -220,7 +229,11 @@ export default function TasksPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 flex-1">
-            {inProgressTasks.map((task, i) => (
+            {isLoading ? (
+              <>
+                <TaskSkeleton />
+              </>
+            ) : inProgressTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 + 0.2 }}>
                 <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<Clock className="w-4 h-4 text-blue-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
@@ -241,7 +254,11 @@ export default function TasksPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 flex-1">
-            {inReviewTasks.map((task, i) => (
+            {isLoading ? (
+              <>
+                <TaskSkeleton />
+              </>
+            ) : inReviewTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 + 0.3 }}>
                 <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<Clock className="w-4 h-4 text-purple-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
@@ -262,7 +279,12 @@ export default function TasksPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 flex-1">
-            {doneTasks.map((task, i) => (
+            {isLoading ? (
+              <>
+                <TaskSkeleton />
+                <TaskSkeleton />
+              </>
+            ) : doneTasks.map((task, i) => (
               <motion.div key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 + 0.4 }}>
                 <TaskCard task={task} users={users} priorityColor={getPriorityColor(task.priority)} icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} onClick={() => handleEditTask(task)} />
               </motion.div>
@@ -398,6 +420,24 @@ function TaskCard({ task, priorityColor, icon, users, onClick }: { task: any, pr
         <Avatar className="w-6 h-6 border-2 border-background shadow-sm" title={fullName}>
           <AvatarFallback className="text-[10px] bg-blue-100 text-blue-700">{initials}</AvatarFallback>
         </Avatar>
+      </div>
+    </Card>
+  );
+}
+
+function TaskSkeleton() {
+  return (
+    <Card className="p-4 border-black/5 dark:border-white/10 bg-black/5 dark:bg-white/5 animate-pulse rounded-2xl flex flex-col gap-3 min-h-[140px]">
+      <div className="flex justify-between items-start mb-1">
+        <div className="h-4 w-12 bg-black/10 dark:bg-white/10 rounded-full" />
+        <div className="h-4 w-4 bg-black/10 dark:bg-white/10 rounded-full" />
+      </div>
+      <div className="h-4 w-3/4 bg-black/10 dark:bg-white/10 rounded" />
+      <div className="h-3 w-full bg-black/10 dark:bg-white/10 rounded mt-1" />
+      <div className="h-3 w-5/6 bg-black/10 dark:bg-white/10 rounded" />
+      <div className="flex items-center justify-between mt-auto pt-3">
+        <div className="h-3 w-16 bg-black/10 dark:bg-white/10 rounded" />
+        <div className="h-6 w-6 bg-black/10 dark:bg-white/10 rounded-full" />
       </div>
     </Card>
   );

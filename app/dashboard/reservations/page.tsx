@@ -374,9 +374,10 @@ interface ReservationCardProps {
   onDelete: (r: Reservation) => void;
   onStatusUpdate?: (r: Reservation, status: "approved" | "rejected") => void;
   canApprove?: boolean;
+  currentUserId?: string;
 }
 
-function ReservationCard({ reservation, index, onEdit, onDelete, onStatusUpdate, canApprove }: ReservationCardProps) {
+function ReservationCard({ reservation, index, onEdit, onDelete, onStatusUpdate, canApprove, currentUserId }: ReservationCardProps) {
   const statusAccent = {
     approved: "bg-emerald-500/20",
     pending: "bg-amber-500/20",
@@ -422,26 +423,30 @@ function ReservationCard({ reservation, index, onEdit, onDelete, onStatusUpdate,
 
         {/* Actions */}
         <div className="flex items-center gap-2 z-10 pt-1 border-t border-black/5 dark:border-white/5">
-          <Button
-            id={`edit-reservation-${reservation.id}`}
-            size="sm"
-            variant="ghost"
-            onClick={() => onEdit(reservation)}
-            className="gap-1.5 text-xs h-7 px-3 rounded-lg hover:bg-blue-500/10 hover:text-blue-600"
-          >
-            <Pencil className="w-3 h-3" />
-            Edit
-          </Button>
-          <Button
-            id={`delete-reservation-${reservation.id}`}
-            size="sm"
-            variant="ghost"
-            onClick={() => onDelete(reservation)}
-            className="gap-1.5 text-xs h-7 px-3 rounded-lg hover:bg-red-500/10 hover:text-red-600"
-          >
-            <Trash2 className="w-3 h-3" />
-            Cancel
-          </Button>
+          {(canApprove || reservation.requested_by === currentUserId) && (
+            <>
+              <Button
+                id={`edit-reservation-${reservation.id}`}
+                size="sm"
+                variant="ghost"
+                onClick={() => onEdit(reservation)}
+                className="gap-1.5 text-xs h-7 px-3 rounded-lg hover:bg-blue-500/10 hover:text-blue-600"
+              >
+                <Pencil className="w-3 h-3" />
+                Edit
+              </Button>
+              <Button
+                id={`delete-reservation-${reservation.id}`}
+                size="sm"
+                variant="ghost"
+                onClick={() => onDelete(reservation)}
+                className="gap-1.5 text-xs h-7 px-3 rounded-lg hover:bg-red-500/10 hover:text-red-600"
+              >
+                <Trash2 className="w-3 h-3" />
+                Cancel
+              </Button>
+            </>
+          )}
 
           {/* Staff/Admin approval actions for pending reservations */}
           {canApprove && reservation.status === "pending" && onStatusUpdate && (
@@ -691,6 +696,7 @@ export default function ReservationsPage() {
                     onDelete={setDeleteTarget}
                     onStatusUpdate={handleStatusUpdate}
                     canApprove={canApprove}
+                    currentUserId={user?.id}
                   />
                 ))}
               </AnimatePresence>
