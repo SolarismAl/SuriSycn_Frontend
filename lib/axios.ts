@@ -40,10 +40,11 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized globally
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      // Ideally trigger a refresh token flow here
-      // For now, logout if unauthorized
-      useAuthStore.getState().logout();
-      window.location.href = "/login";
+      // Skip the global redirect if the user is already trying to log in
+      if (!originalRequest.url?.includes("/login") && !originalRequest.url?.includes("/register")) {
+        useAuthStore.getState().logout();
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
