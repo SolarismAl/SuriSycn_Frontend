@@ -28,8 +28,11 @@ export default function TasksPage() {
   const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchTasks();
-    fetchUsers();
+    const init = async () => {
+      await fetchTasks();
+      await fetchUsers();
+    };
+    init();
   }, []);
 
   const fetchUsers = async () => {
