@@ -39,11 +39,9 @@ export default function SchedulePage() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [eventsRes, deptsRes, usersRes] = await Promise.all([
-          api.get("/events"),
-          api.get("/departments").catch(() => ({ data: { status: "error", data: [] } })),
-          api.get("/users").catch(() => ({ data: { status: "error", data: [] } }))
-        ]);
+        const eventsRes = await api.get("/events");
+        const deptsRes = await api.get("/departments").catch(() => ({ data: { status: "error", data: [] } }));
+        const usersRes = await api.get("/users").catch(() => ({ data: { status: "error", data: [] } }));
         
         if (eventsRes.data?.status === "success") {
           const eventsList = Array.isArray(eventsRes.data.data) ? eventsRes.data.data : (eventsRes.data.data.data || []);
