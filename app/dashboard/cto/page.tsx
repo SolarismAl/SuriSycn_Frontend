@@ -162,6 +162,32 @@ export default function CTOPage() {
       return;
     }
 
+    if (formData.office_order_id !== "none") {
+      const selectedOO = officeOrders.find(oo => oo.id === formData.office_order_id);
+      if (selectedOO) {
+        const selectedDate = parseISO(formData.date);
+        const validFrom = parseISO(selectedOO.valid_from);
+        const validUntil = parseISO(selectedOO.valid_until);
+        selectedDate.setHours(0,0,0,0);
+        validFrom.setHours(0,0,0,0);
+        validUntil.setHours(0,0,0,0);
+        
+        if (selectedDate < validFrom || selectedDate > validUntil) {
+          toast.error(`The selected start date must be between ${format(validFrom, 'MMM d, yyyy')} and ${format(validUntil, 'MMM d, yyyy')} for the selected Office Order.`);
+          return;
+        }
+
+        if (formData.endDate) {
+          const selectedEndDate = parseISO(formData.endDate);
+          selectedEndDate.setHours(0,0,0,0);
+          if (selectedEndDate < validFrom || selectedEndDate > validUntil) {
+            toast.error(`The selected end date must be between ${format(validFrom, 'MMM d, yyyy')} and ${format(validUntil, 'MMM d, yyyy')} for the selected Office Order.`);
+            return;
+          }
+        }
+      }
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -625,23 +651,23 @@ export default function CTOPage() {
                   required
                 >
                   <option value="none" disabled>-- Select Office Order --</option>
-                  {officeOrders.filter(oo => {
+                  {officeOrders.map(oo => {
                     try {
-                      if (!formData.date) return true;
-                      const selectedDate = parseISO(formData.date);
-                      const validFrom = parseISO(oo.valid_from);
-                      const validUntil = parseISO(oo.valid_until);
-                      // Set hours to 0 to compare just the dates
-                      selectedDate.setHours(0,0,0,0);
-                      validFrom.setHours(0,0,0,0);
-                      validUntil.setHours(0,0,0,0);
-                      return selectedDate >= validFrom && selectedDate <= validUntil;
+                      const validFrom = format(parseISO(oo.valid_from), 'MMM d, yyyy');
+                      const validUntil = format(parseISO(oo.valid_until), 'MMM d, yyyy');
+                      return (
+                        <option key={oo.id} value={oo.id}>
+                          {oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject} ({validFrom} - {validUntil})
+                        </option>
+                      );
                     } catch (e) {
-                      return true;
+                      return (
+                        <option key={oo.id} value={oo.id}>
+                          {oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject}
+                        </option>
+                      );
                     }
-                  }).map(oo => (
-                    <option key={oo.id} value={oo.id}>{oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject}</option>
-                  ))}
+                  })}
                 </select>
                 {officeOrders.length === 0 && (
                   <p className="text-xs text-red-500">You do not have any active Office Orders assigned to you.</p>
