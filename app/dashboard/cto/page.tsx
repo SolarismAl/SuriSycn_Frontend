@@ -80,8 +80,17 @@ export default function CTOPage() {
   }, [isAdminOrManager]);
 
   useEffect(() => {
-    fetchData(selectedUserId);
-  }, [selectedUserId, fetchData]);
+    if (user && !isAdminOrManager && selectedUserId === "all") {
+      setSelectedUserId(user.id.toString());
+    }
+  }, [user, isAdminOrManager, selectedUserId]);
+
+  useEffect(() => {
+    if (user) {
+      if (selectedUserId === "all" && !isAdminOrManager) return;
+      fetchData(selectedUserId);
+    }
+  }, [selectedUserId, fetchData, user, isAdminOrManager]);
 
   // Auto-calculate hours if start/end time is provided
   useEffect(() => {
