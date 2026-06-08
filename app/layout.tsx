@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'SuriSync - Office Management',
+  title: 'CITO Workspace - Office Management',
   description: 'Modern internal office management system for Surigao City.',
 };
 

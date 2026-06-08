@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   BarChart,
+  Clock,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { api } from "@/lib/axios";
@@ -56,6 +57,12 @@ const allNavItems: NavItem[] = [
     label: "Directory",
     href: "/dashboard/directory",
     roles: ["admin", "manager"],
+  },
+  {
+    icon: Clock,
+    label: "Time Off",
+    href: "/dashboard/cto",
+    // visible to everyone
   },
   // {
   //   icon: FileText,
@@ -100,9 +107,9 @@ export function Sidebar({ isOpen = false }: { isOpen?: boolean }) {
     >
       <div className="flex items-center gap-3 px-2 mb-8">
         <div className="w-8 h-8 flex items-center justify-center shrink-0">
-          <Image src="/images/surigao-logo.png" alt="Surigao City Logo" width={32} height={32} className="object-contain" />
+          <Image src="/images/cito-logo.png" alt="CITO Logo" width={32} height={32} className="object-contain" />
         </div>
-        <span className="font-semibold text-lg tracking-tight">SuriSync</span>
+        <span className="font-semibold text-lg tracking-tight">CITO Workspace</span>
       </div>
 
       <nav className="flex-1 flex flex-col gap-1">

@@ -50,6 +50,7 @@ export default function SchedulePage() {
             title: e.title,
             start: e.start_date,
             end: e.end_date,
+            is_meeting: e.is_meeting,
             backgroundColor: e.color || "#3b82f6",
             borderColor: e.color || "#3b82f6",
           }));
@@ -87,6 +88,7 @@ export default function SchedulePage() {
   const [newEventDepartmentId, setNewEventDepartmentId] = useState("");
   const [newEventTaggedUsers, setNewEventTaggedUsers] = useState<string[]>([]);
   const [newEventExternalParticipants, setNewEventExternalParticipants] = useState("");
+  const [newEventIsMeeting, setNewEventIsMeeting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
@@ -121,6 +123,7 @@ export default function SchedulePage() {
     setNewEventDepartmentId("");
     setNewEventTaggedUsers([]);
     setNewEventExternalParticipants("");
+    setNewEventIsMeeting(false);
     setEditingEventId(null);
     setIsModalOpen(true);
   };
@@ -151,6 +154,7 @@ export default function SchedulePage() {
     
     setNewEventTaggedUsers(selectedEvent.tagged_users ? selectedEvent.tagged_users.map((u:any) => u.id) : []);
     setNewEventExternalParticipants(selectedEvent.external_participants ? selectedEvent.external_participants.join(", ") : "");
+    setNewEventIsMeeting(selectedEvent.is_meeting || false);
     
     setEditingEventId(selectedEvent.id);
     setIsViewModalOpen(false);
@@ -195,6 +199,7 @@ export default function SchedulePage() {
         external_participants: newEventExternalParticipants
           ? newEventExternalParticipants.split(",").map(e => e.trim()).filter(Boolean)
           : [],
+        is_meeting: newEventIsMeeting,
       };
       
       let response;
@@ -211,6 +216,7 @@ export default function SchedulePage() {
           title: e.title,
           start: e.start_date,
           end: e.end_date,
+          is_meeting: e.is_meeting,
           backgroundColor: e.color || "#10b981",
           borderColor: e.color || "#10b981",
         };
@@ -253,6 +259,7 @@ export default function SchedulePage() {
           title: arg.event.title,
           start_date: arg.event.startStr,
           end_date: arg.event.endStr,
+          is_meeting: arg.event.extendedProps?.is_meeting,
           color: arg.event.backgroundColor,
         });
       }
@@ -262,6 +269,7 @@ export default function SchedulePage() {
         title: arg.event.title,
         start_date: arg.event.startStr,
         end_date: arg.event.endStr,
+        is_meeting: arg.event.extendedProps?.is_meeting,
         color: arg.event.backgroundColor,
       });
     }
@@ -417,6 +425,32 @@ export default function SchedulePage() {
               />
             </div>
             
+            <div className="grid gap-2 mt-2 mb-2">
+              <Label>Type</Label>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="is_meeting"
+                    checked={!newEventIsMeeting}
+                    onChange={() => setNewEventIsMeeting(false)}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <span className="text-sm">Event</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="is_meeting"
+                    checked={newEventIsMeeting}
+                    onChange={() => setNewEventIsMeeting(true)}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <span className="text-sm">Meeting</span>
+                </label>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="date">
@@ -583,18 +617,21 @@ export default function SchedulePage() {
                   style={{ backgroundColor: selectedEvent.color }}
                 />
               )}
-              <DialogTitle className="text-xl leading-tight">{selectedEvent?.title}</DialogTitle>
+              <DialogTitle className="text-xl leading-tight">
+                {selectedEvent?.is_meeting && <span className="mr-2 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Meeting</span>}
+                {selectedEvent?.title}
+              </DialogTitle>
             </div>
             <DialogDescription>Event details</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
             {selectedEvent?.description && (
               <div className="flex gap-3 text-sm">
                 <Tag className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="w-full">
                   <p className="font-medium">Description</p>
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{selectedEvent.description}</p>
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">{selectedEvent.description}</p>
                 </div>
               </div>
             )}

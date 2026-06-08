@@ -236,7 +236,7 @@ export default function DashboardPage() {
           transition={{ duration: 0.3, delay: 0.1 }}
           className="text-muted-foreground"
         >
-          Welcome back to SuriSync. Here&apos;s what&apos;s happening today.
+          Welcome back to CITO Workspace. Here&apos;s what&apos;s happening today.
         </motion.p>
       </div>
 

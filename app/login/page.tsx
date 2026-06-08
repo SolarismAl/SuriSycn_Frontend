@@ -154,7 +154,7 @@ export default function LoginPage() {
       if (response.data?.status === "success") {
         const { user: u, access_token } = response.data.data;
         login(u, access_token);
-        toast.success("Account created! Welcome to SuriSync.");
+        toast.success("Account created! Welcome to CITO Workspace.");
         router.push("/dashboard/schedule");
       } else {
         toast.error("Registration failed");
@@ -186,20 +186,20 @@ export default function LoginPage() {
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-blue-900/90 to-blue-900/50 dark:from-slate-950/90 dark:to-slate-950/50" />
         
         <div className="relative z-10 max-w-xl">
-          {/* <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center p-2 mb-8 shadow-lg">
-            <Image src="/images/surigao-logo.png" alt="Surigao City Logo" width={80} height={80} className="object-contain" />
-          </div> */}
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center p-2 mb-8 shadow-lg">
+            <Image src="/images/cito-logo.png" alt="CITO Logo" width={80} height={80} className="object-contain" />
+          </div>
           <div className="text-sm font-bold tracking-widest text-blue-300 uppercase mb-3">
             Republic of the Philippines
           </div>
           <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-6">
-            City Government of Blank
+            City Information Technology Office
           </h1>
           <h2 className="text-2xl font-medium text-blue-100 mb-6">
             Centralized Resource & Workflow Portal
           </h2>
           <p className="text-blue-200/80 leading-relaxed text-lg mb-8">
-            SuriSync streamlines department workflows, simplifies meeting room reservations, and enhances overall operational efficiency across city offices. Access all your tools and manage your tasks in one secure, unified platform.
+            This system is strictly for the City Information Technology Office only. CITO Workspace streamlines department workflows, simplifies meeting room reservations, and enhances overall operational efficiency across city offices. Access all your tools and manage your tasks in one secure, unified platform.
           </p>
           <div className="flex items-center gap-6 text-sm font-medium text-blue-300">
              <span>✓ Secure Access</span>
@@ -220,15 +220,16 @@ export default function LoginPage() {
           {/* Logo for mobile only */}
           <div className="lg:hidden mb-8 text-center flex flex-col items-center">
             <div className="w-16 h-16 flex items-center justify-center mb-4 shrink-0">
-              <Image src="/images/surigao-logo.png" alt="Surigao City Logo" width={64} height={64} className="object-contain" />
+              <Image src="/images/cito-logo.png" alt="CITO Logo" width={64} height={64} className="object-contain" />
             </div>
             <div className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-bold mb-1.5">
               Republic of the Philippines
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              City Government of Surigao
+              City Information Technology Office
             </h1>
             <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
+              This system is strictly for the City Information Technology Office only.<br />
               {tab === "login" ? "Sign in to access the portal" : "Create your official account"}
             </p>
           </div>
