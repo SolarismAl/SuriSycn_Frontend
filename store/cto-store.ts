@@ -1,9 +1,21 @@
 import { create } from 'zustand';
 import { api } from '@/lib/axios';
 
+export type OfficeOrder = {
+  id: string;
+  memo_number: string | null;
+  subject: string;
+  description: string | null;
+  date_issued: string;
+  valid_from: string;
+  valid_until: string;
+  is_active: boolean;
+};
+
 export type CtoEntry = {
   id: string;
   user_id: string;
+  office_order_id: string | null;
   type: "earned" | "used";
   date: string;
   hours: string;
@@ -15,6 +27,7 @@ export type CtoEntry = {
     first_name: string;
     last_name: string;
   };
+  office_order?: OfficeOrder;
 };
 
 export type CtoBalance = {
@@ -49,10 +62,9 @@ export const useCtoStore = create<CtoState>((set, get) => ({
     set({ loading: true });
     try {
       const balanceEndpoint = userId === 'all' ? '/cto/overview' : `/cto/balance?user_id=${userId}`;
-      const [entriesRes, balanceRes] = await Promise.all([
-        api.get(`/cto?user_id=${userId}`),
-        api.get(balanceEndpoint)
-      ]);
+      const entriesRes = await api.get(`/cto?user_id=${userId}`);
+      const balanceRes = await api.get(balanceEndpoint);
+      
       set((state) => ({
         cache: {
           ...state.cache,

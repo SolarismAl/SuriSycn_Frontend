@@ -14,9 +14,22 @@ import { useCtoStore } from "@/store/cto-store";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
 
+type OfficeOrder = {
+  id: string;
+  memo_number: string | null;
+  subject: string;
+  description: string | null;
+  date_issued: string;
+  valid_from: string;
+  valid_until: string;
+  is_active: boolean;
+  users?: { id: string; first_name: string; last_name: string }[];
+};
+
 type CtoEntry = {
   id: string;
   user_id: string;
+  office_order_id: string | null;
   type: "earned" | "used";
   date: string;
   hours: string;
@@ -28,6 +41,7 @@ type CtoEntry = {
     first_name: string;
     last_name: string;
   };
+  office_order?: OfficeOrder;
 };
 
 type CtoBalance = {
@@ -61,6 +75,7 @@ export default function CTOPage() {
     hours: "",
     reason: "",
     isHoliday: false,
+    office_order_id: "none",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -73,6 +88,30 @@ export default function CTOPage() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [officeOrders, setOfficeOrders] = useState<OfficeOrder[]>([]);
+  const [isOfficeOrderModalOpen, setIsOfficeOrderModalOpen] = useState(false);
+  const [editingOfficeOrder, setEditingOfficeOrder] = useState<OfficeOrder | null>(null);
+  const [officeOrderForm, setOfficeOrderForm] = useState({
+    memo_number: "", subject: "", description: "", 
+    date_issued: format(new Date(), "yyyy-MM-dd"), 
+    valid_from: format(new Date(), "yyyy-MM-dd"), 
+    valid_until: format(addDays(new Date(), 7), "yyyy-MM-dd"), 
+    is_active: true, user_ids: [] as string[]
+  });
+
+  const fetchOfficeOrders = async () => {
+    try {
+      const res = await api.get("/office-orders");
+      setOfficeOrders(res.data.data);
+    } catch (e) { console.error("Failed to fetch office orders", e); }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchOfficeOrders();
+    }
+  }, [user]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -118,6 +157,10 @@ export default function CTOPage() {
       toast.error("Please provide a reason");
       return;
     }
+    if (formData.office_order_id === "none") {
+      toast.error("Please select an Office Order to charge this request to.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -151,12 +194,13 @@ export default function CTOPage() {
           date: d,
           hours: submittedHours,
           reason: formData.reason,
+          office_order_id: formData.office_order_id !== "none" ? formData.office_order_id : null,
         });
       }
 
       toast.success(datesToSubmit.length > 1 ? `Successfully submitted ${datesToSubmit.length} requests` : "Request submitted successfully");
       setIsModalOpen(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), endDate: "", startTime: "", endTime: "", hours: "", reason: "", isHoliday: false });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), endDate: "", startTime: "", endTime: "", hours: "", reason: "", isHoliday: false, office_order_id: "none" });
       fetchData(selectedUserId, true);
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to submit request");
@@ -251,6 +295,42 @@ export default function CTOPage() {
     );
   }
 
+  const handleOfficeOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!officeOrderForm.subject) return toast.error("Subject is required");
+    if (officeOrderForm.user_ids.length === 0) return toast.error("Please assign at least one employee");
+    if (isAfter(parseISO(officeOrderForm.valid_from), parseISO(officeOrderForm.valid_until))) return toast.error("Valid From must be before Valid Until");
+
+    try {
+      setIsSubmitting(true);
+      if (editingOfficeOrder) {
+        await api.put(`/office-orders/${editingOfficeOrder.id}`, officeOrderForm);
+        toast.success("Office order updated successfully");
+      } else {
+        await api.post("/office-orders", officeOrderForm);
+        toast.success("Office order created successfully");
+      }
+      setEditingOfficeOrder(null);
+      setOfficeOrderForm({ memo_number: "", subject: "", description: "", date_issued: format(new Date(), "yyyy-MM-dd"), valid_from: format(new Date(), "yyyy-MM-dd"), valid_until: format(addDays(new Date(), 7), "yyyy-MM-dd"), is_active: true, user_ids: [] });
+      fetchOfficeOrders();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to save office order");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOfficeOrderDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this office order?")) return;
+    try {
+      await api.delete(`/office-orders/${id}`);
+      toast.success("Office order deleted successfully");
+      fetchOfficeOrders();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete office order");
+    }
+  };
+
   const ITEMS_PER_PAGE = 10;
   const totalPages = Math.ceil(entries.length / ITEMS_PER_PAGE);
   const paginatedEntries = entries.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -271,6 +351,16 @@ export default function CTOPage() {
             <Calendar className="w-4 h-4 mr-2 text-slate-600" />
             View Calendar
           </Button>
+          {isAdminOrManager && (
+            <Button 
+              variant="outline"
+              className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50"
+              onClick={() => setIsOfficeOrderModalOpen(true)}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Manage Office Orders
+            </Button>
+          )}
           <Button 
             onClick={() => { setModalType("earned"); setIsModalOpen(true); }}
             className="bg-blue-600 hover:bg-blue-700"
@@ -442,7 +532,14 @@ export default function CTOPage() {
                       )}
                       <td className="px-4 py-3">{getTypeBadge(entry.type)}</td>
                       <td className="px-4 py-3 font-medium">{entry.hours}</td>
-                      <td className="px-4 py-3 max-w-[200px] truncate" title={entry.reason}>{entry.reason}</td>
+                      <td className="px-4 py-3 max-w-[200px] truncate" title={entry.reason}>
+                        {entry.office_order && (
+                          <Badge variant="outline" className="mr-2 bg-muted/50 font-mono text-[10px]" title={entry.office_order.subject}>
+                            {entry.office_order.memo_number || 'MEMO'}
+                          </Badge>
+                        )}
+                        {entry.reason}
+                      </td>
                       <td className="px-4 py-3">{getStatusBadge(entry.status)}</td>
                       {isAdminOrManager && (
                         <td className="px-4 py-3 text-right">
@@ -519,6 +616,37 @@ export default function CTOPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+              <div className="grid gap-2">
+                <Label>Charge to Office Order / Memorandum <span className="text-red-500">*</span></Label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={formData.office_order_id}
+                  onChange={(e) => setFormData({...formData, office_order_id: e.target.value})}
+                  required
+                >
+                  <option value="none" disabled>-- Select Office Order --</option>
+                  {officeOrders.filter(oo => {
+                    try {
+                      if (!formData.date) return true;
+                      const selectedDate = parseISO(formData.date);
+                      const validFrom = parseISO(oo.valid_from);
+                      const validUntil = parseISO(oo.valid_until);
+                      // Set hours to 0 to compare just the dates
+                      selectedDate.setHours(0,0,0,0);
+                      validFrom.setHours(0,0,0,0);
+                      validUntil.setHours(0,0,0,0);
+                      return selectedDate >= validFrom && selectedDate <= validUntil;
+                    } catch (e) {
+                      return true;
+                    }
+                  }).map(oo => (
+                    <option key={oo.id} value={oo.id}>{oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject}</option>
+                  ))}
+                </select>
+                {officeOrders.length === 0 && (
+                  <p className="text-xs text-red-500">You do not have any active Office Orders assigned to you.</p>
+                )}
+              </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Start Date</Label>
@@ -906,6 +1034,188 @@ export default function CTOPage() {
                   );
                 });
               })()}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Office Orders Admin Modal */}
+      <Dialog open={isOfficeOrderModalOpen} onOpenChange={setIsOfficeOrderModalOpen}>
+        <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Office Orders</DialogTitle>
+            <DialogDescription>
+              Create or manage official memorandums and office orders. Employees can tie their CTO logs to these orders.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+            {/* Form Section */}
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3 border-b bg-muted/20">
+                <CardTitle className="text-sm font-semibold">{editingOfficeOrder ? 'Edit' : 'Create New'} Office Order</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                <div className="grid gap-2">
+                  <Label>Memo Number (Optional)</Label>
+                  <Input 
+                    placeholder="e.g. OO-2026-001" 
+                    value={officeOrderForm.memo_number}
+                    onChange={(e) => setOfficeOrderForm({...officeOrderForm, memo_number: e.target.value})}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Subject / Title <span className="text-red-500">*</span></Label>
+                  <Input 
+                    placeholder="Authority to Render Overtime..." 
+                    value={officeOrderForm.subject}
+                    onChange={(e) => setOfficeOrderForm({...officeOrderForm, subject: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Valid From <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="date"
+                      value={officeOrderForm.valid_from}
+                      onChange={(e) => setOfficeOrderForm({...officeOrderForm, valid_from: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Valid Until <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="date"
+                      value={officeOrderForm.valid_until}
+                      onChange={(e) => setOfficeOrderForm({...officeOrderForm, valid_until: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Date Issued</Label>
+                  <Input 
+                    type="date"
+                    value={officeOrderForm.date_issued}
+                    onChange={(e) => setOfficeOrderForm({...officeOrderForm, date_issued: e.target.value})}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Authorized Employees <span className="text-red-500">*</span></Label>
+                  <div className="border rounded-md max-h-40 overflow-y-auto p-2 bg-muted/10">
+                    {users.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">Loading users...</span>
+                    ) : (
+                      users.map(u => (
+                        <label key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-muted/50 rounded cursor-pointer text-sm">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            checked={officeOrderForm.user_ids.includes(u.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setOfficeOrderForm({...officeOrderForm, user_ids: [...officeOrderForm.user_ids, u.id]});
+                              } else {
+                                setOfficeOrderForm({...officeOrderForm, user_ids: officeOrderForm.user_ids.filter(id => id !== u.id)});
+                              }
+                            }}
+                          />
+                          {u.first_name} {u.last_name}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer mt-2">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={officeOrderForm.is_active}
+                    onChange={(e) => setOfficeOrderForm({...officeOrderForm, is_active: e.target.checked})}
+                  />
+                  <span className="text-sm font-medium">Active (Visible to users)</span>
+                </label>
+                <div className="flex justify-end gap-2 pt-2">
+                  {editingOfficeOrder && (
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        setEditingOfficeOrder(null);
+                        setOfficeOrderForm({ memo_number: "", subject: "", description: "", date_issued: format(new Date(), "yyyy-MM-dd"), valid_from: format(new Date(), "yyyy-MM-dd"), valid_until: format(addDays(new Date(), 7), "yyyy-MM-dd"), is_active: true, user_ids: [] });
+                      }}
+                    >
+                      Cancel Edit
+                    </Button>
+                  )}
+                  <Button onClick={handleOfficeOrderSubmit} disabled={isSubmitting}>
+                    {editingOfficeOrder ? 'Save Changes' : 'Create Office Order'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* List Section */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">Existing Office Orders</h3>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar pb-2">
+                {officeOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic text-center pt-8">No office orders found.</p>
+                ) : (
+                  officeOrders.map(oo => (
+                    <div key={oo.id} className={`p-3 border rounded-md relative group transition-colors hover:shadow-sm ${!oo.is_active ? 'bg-muted/30 opacity-70' : 'bg-card'}`}>
+                      <div className="flex justify-between items-start gap-2 pr-14">
+                        <div>
+                          <h4 className="font-medium text-sm leading-tight mb-1">{oo.memo_number ? `${oo.memo_number}: ` : ''}{oo.subject}</h4>
+                          <p className="text-xs text-muted-foreground mb-2">Valid: {format(parseISO(oo.valid_from), 'MMM d, yyyy')} - {format(parseISO(oo.valid_until), 'MMM d, yyyy')}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {oo.users?.slice(0, 3).map(u => (
+                              <Badge key={u.id} variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-normal">
+                                {u.first_name} {u.last_name[0]}.
+                              </Badge>
+                            ))}
+                            {(oo.users?.length || 0) > 3 && (
+                              <Badge variant="secondary" className="text-[10px] bg-muted font-normal">
+                                +{(oo.users?.length || 0) - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border-none ${oo.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
+                          {oo.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-background/80 backdrop-blur rounded p-1 shadow-sm border">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setEditingOfficeOrder(oo);
+                            setOfficeOrderForm({
+                              memo_number: oo.memo_number || "",
+                              subject: oo.subject,
+                              description: oo.description || "",
+                              date_issued: oo.date_issued.split('T')[0],
+                              valid_from: oo.valid_from.split('T')[0],
+                              valid_until: oo.valid_until.split('T')[0],
+                              is_active: oo.is_active,
+                              user_ids: oo.users?.map(u => u.id) || []
+                            });
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleOfficeOrderDelete(oo.id)}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
