@@ -124,24 +124,22 @@ export default function CTOPage() {
         curr = addDays(curr, 1);
       }
 
-      await Promise.all(
-        datesToSubmit.map(d => {
-          let submittedHours = modalType === 'used' ? "8" : formData.hours;
-          if (modalType === 'earned') {
-             const dayIsWeekend = isWeekend(parseISO(d));
-             if (dayIsWeekend || formData.isHoliday) {
-                submittedHours = String(Number(formData.hours) * 1.5);
-             }
-          }
-          
-          return api.post("/cto", {
-            type: modalType,
-            date: d,
-            hours: submittedHours,
-            reason: formData.reason,
-          });
-        })
-      );
+      for (const d of datesToSubmit) {
+        let submittedHours = modalType === 'used' ? "8" : formData.hours;
+        if (modalType === 'earned') {
+           const dayIsWeekend = isWeekend(parseISO(d));
+           if (dayIsWeekend || formData.isHoliday) {
+              submittedHours = String(Number(formData.hours) * 1.5);
+           }
+        }
+        
+        await api.post("/cto", {
+          type: modalType,
+          date: d,
+          hours: submittedHours,
+          reason: formData.reason,
+        });
+      }
 
       toast.success(datesToSubmit.length > 1 ? `Successfully submitted ${datesToSubmit.length} requests` : "Request submitted successfully");
       setIsModalOpen(false);
