@@ -72,7 +72,11 @@ export default function CTOPage() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+  const [currentPage, setCurrentPage] = useState(1);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedUserId]);
   useEffect(() => {
     if (isAdminOrManager) {
       api.get("/users").then(res => setUsers(res.data.data)).catch(console.error);
@@ -247,6 +251,10 @@ export default function CTOPage() {
     );
   }
 
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(entries.length / ITEMS_PER_PAGE);
+  const paginatedEntries = entries.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -408,7 +416,7 @@ export default function CTOPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {entries.map((entry) => (
+                  {paginatedEntries.map((entry) => (
                     <tr key={entry.id} className="hover:bg-muted/30">
                       {isAdminOrManager && (
                         <td className="px-4 py-3">
@@ -459,6 +467,41 @@ export default function CTOPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          
+          {totalPages > 1 && entries.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-muted/50 px-2 py-3 sm:px-6 mt-2 rounded-md bg-muted/10 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground text-center sm:text-left">
+                  Showing <span className="font-medium text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, entries.length)}</span> of <span className="font-medium text-foreground">{entries.length}</span> results
+                </p>
+              </div>
+              <div>
+                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-r-none h-8 text-xs"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center px-4 border-y border-input bg-background text-xs font-medium text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-l-none h-8 text-xs"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </nav>
+              </div>
             </div>
           )}
         </CardContent>
