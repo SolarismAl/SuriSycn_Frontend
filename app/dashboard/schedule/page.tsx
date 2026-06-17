@@ -51,6 +51,7 @@ export default function SchedulePage() {
             start: e.start_date,
             end: e.end_date,
             is_meeting: e.is_meeting,
+            is_reminder: e.is_reminder,
             backgroundColor: e.color || "#3b82f6",
             borderColor: e.color || "#3b82f6",
           }));
@@ -88,7 +89,7 @@ export default function SchedulePage() {
   const [newEventDepartmentId, setNewEventDepartmentId] = useState("");
   const [newEventTaggedUsers, setNewEventTaggedUsers] = useState<string[]>([]);
   const [newEventExternalParticipants, setNewEventExternalParticipants] = useState("");
-  const [newEventIsMeeting, setNewEventIsMeeting] = useState(false);
+  const [eventType, setEventType] = useState<"event" | "meeting" | "reminder">("event");
   const [isSaving, setIsSaving] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
@@ -123,7 +124,7 @@ export default function SchedulePage() {
     setNewEventDepartmentId("");
     setNewEventTaggedUsers([]);
     setNewEventExternalParticipants("");
-    setNewEventIsMeeting(false);
+    setEventType("event");
     setEditingEventId(null);
     setIsModalOpen(true);
   };
@@ -154,7 +155,9 @@ export default function SchedulePage() {
     
     setNewEventTaggedUsers(selectedEvent.tagged_users ? selectedEvent.tagged_users.map((u:any) => u.id) : []);
     setNewEventExternalParticipants(selectedEvent.external_participants ? selectedEvent.external_participants.join(", ") : "");
-    setNewEventIsMeeting(selectedEvent.is_meeting || false);
+    if (selectedEvent.is_reminder) setEventType("reminder");
+    else if (selectedEvent.is_meeting) setEventType("meeting");
+    else setEventType("event");
     
     setEditingEventId(selectedEvent.id);
     setIsViewModalOpen(false);
@@ -199,7 +202,8 @@ export default function SchedulePage() {
         external_participants: newEventExternalParticipants
           ? newEventExternalParticipants.split(",").map(e => e.trim()).filter(Boolean)
           : [],
-        is_meeting: newEventIsMeeting,
+        is_meeting: eventType === "meeting",
+        is_reminder: eventType === "reminder",
       };
       
       let response;
@@ -217,6 +221,7 @@ export default function SchedulePage() {
           start: e.start_date,
           end: e.end_date,
           is_meeting: e.is_meeting,
+          is_reminder: e.is_reminder,
           backgroundColor: e.color || "#10b981",
           borderColor: e.color || "#10b981",
         };
@@ -431,9 +436,9 @@ export default function SchedulePage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="is_meeting"
-                    checked={!newEventIsMeeting}
-                    onChange={() => setNewEventIsMeeting(false)}
+                    name="event_type"
+                    checked={eventType === "event"}
+                    onChange={() => setEventType("event")}
                     className="w-4 h-4 accent-blue-600"
                   />
                   <span className="text-sm">Event</span>
@@ -441,12 +446,22 @@ export default function SchedulePage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="is_meeting"
-                    checked={newEventIsMeeting}
-                    onChange={() => setNewEventIsMeeting(true)}
+                    name="event_type"
+                    checked={eventType === "meeting"}
+                    onChange={() => setEventType("meeting")}
                     className="w-4 h-4 accent-blue-600"
                   />
                   <span className="text-sm">Meeting</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="event_type"
+                    checked={eventType === "reminder"}
+                    onChange={() => setEventType("reminder")}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <span className="text-sm">Reminder</span>
                 </label>
               </div>
             </div>
@@ -485,6 +500,18 @@ export default function SchedulePage() {
                   onChange={(e) => setNewEventEndTime(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { setNewEventTime("08:00"); setNewEventEndTime("17:00"); }} className="text-xs">
+                Whole Day (8 AM - 5 PM)
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setNewEventTime("08:00"); setNewEventEndTime("12:00"); }} className="text-xs">
+                Half Day AM (8-12)
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setNewEventTime("13:00"); setNewEventEndTime("17:00"); }} className="text-xs">
+                Half Day PM (1-5)
+              </Button>
             </div>
 
             <div className="grid gap-2">
