@@ -14,6 +14,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'CITO Workspace - Office Management',
   description: 'Modern internal office management system for Surigao City.',
+  icons: {
+    icon: '/images/cito-logo.png',
+    shortcut: '/images/cito-logo.png',
+    apple: '/images/cito-logo.png',
+  },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

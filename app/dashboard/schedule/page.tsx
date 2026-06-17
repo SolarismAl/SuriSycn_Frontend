@@ -8,7 +8,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Clock, RefreshCw, Trash2, Tag, Building2, Edit } from "lucide-react";
+import { Plus, Calendar, Clock, RefreshCw, Trash2, Tag, Building2, Edit, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -627,7 +627,11 @@ export default function SchedulePage() {
               disabled={isSaving}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {isSaving ? "Saving Event..." : (editingEventId ? "Update Event" : "Save Event")}
+              {isSaving ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving Event...</>
+              ) : (
+                editingEventId ? "Update Event" : "Save Event"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -758,7 +762,11 @@ export default function SchedulePage() {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button variant="outline" onClick={() => setIsConfirmingDelete(false)} disabled={isDeleting}>Cancel</Button>
                 <Button variant="destructive" onClick={handleDeleteEvent} disabled={isDeleting}>
-                  {isDeleting ? "Deleting..." : "Yes, Delete Event"}
+                  {isDeleting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting...</>
+                  ) : (
+                    "Yes, Delete Event"
+                  )}
                 </Button>
               </div>
             ) : (

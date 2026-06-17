@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { format, parseISO, addDays, isAfter, differenceInMinutes, parse, isWeekend, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, subMonths, addMonths } from "date-fns";
-import { PlusCircle, Clock, CheckCircle2, XCircle, AlertCircle, Calendar } from "lucide-react";
+import { PlusCircle, Clock, CheckCircle2, XCircle, AlertCircle, Calendar, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthStore } from "@/store/auth-store";
 import { useCtoStore } from "@/store/cto-store";
 import { api } from "@/lib/axios";
@@ -526,7 +527,7 @@ export default function CTOPage() {
                     {isAdminOrManager && <th className="px-4 py-3 font-medium">Employee</th>}
                     <th className="px-4 py-3 font-medium">Type</th>
                     <th className="px-4 py-3 font-medium">Hours</th>
-                    <th className="px-4 py-3 font-medium">Reason</th>
+                    <th className="px-4 py-3 font-medium">Reason / Office Order</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     {isAdminOrManager && <th className="px-4 py-3 font-medium text-right">Actions</th>}
                   </tr>
@@ -535,7 +536,7 @@ export default function CTOPage() {
                   {paginatedEntries.map((entry) => (
                     <tr key={entry.id} className="hover:bg-muted/30">
                       {isAdminOrManager && (
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 align-top">
                           {entry.status === 'pending' && (
                             <input 
                               type="checkbox" 
@@ -552,13 +553,13 @@ export default function CTOPage() {
                           )}
                         </td>
                       )}
-                      <td className="px-4 py-3 whitespace-nowrap">{format(new Date(entry.date), "MMM d, yyyy")}</td>
+                      <td className="px-4 py-3 whitespace-nowrap align-top">{format(new Date(entry.date), "MMM d, yyyy")}</td>
                       {isAdminOrManager && (
-                        <td className="px-4 py-3 font-medium">{entry.user?.first_name} {entry.user?.last_name}</td>
+                        <td className="px-4 py-3 font-medium align-top">{entry.user?.first_name} {entry.user?.last_name}</td>
                       )}
-                      <td className="px-4 py-3">{getTypeBadge(entry.type)}</td>
-                      <td className="px-4 py-3 font-medium">{entry.hours}</td>
-                      <td className="px-4 py-3 max-w-[200px] truncate" title={entry.reason}>
+                      <td className="px-4 py-3 align-top">{getTypeBadge(entry.type)}</td>
+                      <td className="px-4 py-3 font-medium align-top">{entry.hours}</td>
+                      <td className="px-4 py-3 max-w-[300px] whitespace-normal break-words leading-relaxed align-top" title={entry.reason}>
                         {entry.office_order && (
                           <Badge variant="outline" className="mr-2 bg-muted/50 font-mono text-[10px]" title={entry.office_order.subject}>
                             {entry.office_order.memo_number || 'MEMO'}
@@ -566,9 +567,9 @@ export default function CTOPage() {
                         )}
                         {entry.reason}
                       </td>
-                      <td className="px-4 py-3">{getStatusBadge(entry.status)}</td>
+                      <td className="px-4 py-3 align-top">{getStatusBadge(entry.status)}</td>
                       {isAdminOrManager && (
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right align-top">
                           {entry.status === 'pending' ? (
                             <Button 
                               variant="outline" 
@@ -644,31 +645,69 @@ export default function CTOPage() {
           <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="grid gap-2">
                 <Label>Charge to Office Order / Memorandum <span className="text-red-500">*</span></Label>
-                <select 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={formData.office_order_id}
-                  onChange={(e) => setFormData({...formData, office_order_id: e.target.value})}
+                <Select 
+                  value={formData.office_order_id === "none" ? undefined : formData.office_order_id} 
+                  onValueChange={(val) => {
+                    const selectedOrder = officeOrders.find(oo => oo.id === val);
+                    setFormData({
+                      ...formData, 
+                      office_order_id: val ?? "none",
+                      reason: selectedOrder && modalType === 'earned' ? selectedOrder.subject : formData.reason
+                    });
+                  }}
                   required
                 >
-                  <option value="none" disabled>-- Select Office Order --</option>
-                  {officeOrders.map(oo => {
-                    try {
-                      const validFrom = format(parseISO(oo.valid_from), 'MMM d, yyyy');
-                      const validUntil = format(parseISO(oo.valid_until), 'MMM d, yyyy');
-                      return (
-                        <option key={oo.id} value={oo.id}>
-                          {oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject} ({validFrom} - {validUntil})
-                        </option>
-                      );
-                    } catch (e) {
-                      return (
-                        <option key={oo.id} value={oo.id}>
-                          {oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject}
-                        </option>
-                      );
-                    }
-                  })}
-                </select>
+                  <SelectTrigger className="w-full h-auto min-h-10 text-left whitespace-normal">
+                    <SelectValue placeholder="-- Select Office Order --">
+                      {formData.office_order_id && formData.office_order_id !== "none" ? (() => {
+                        const oo = officeOrders.find(o => o.id === formData.office_order_id);
+                        if (!oo) return undefined;
+                        const validFrom = format(parseISO(oo.valid_from), 'MMM d, yyyy');
+                        const validUntil = format(parseISO(oo.valid_until), 'MMM d, yyyy');
+                        return (
+                          <span className="line-clamp-2 break-words">
+                            {oo.memo_number ? oo.memo_number + ' - ' : ''}{oo.subject} ({validFrom} - {validUntil})
+                          </span>
+                        );
+                      })() : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false} className="max-h-[300px]">
+                    {officeOrders.filter(oo => {
+                      if (!oo.valid_until) return true;
+                      try {
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const validUntil = parseISO(oo.valid_until);
+                        // If it's expired, don't show it for Request Time Off
+                        if (modalType === 'used' && validUntil < today) {
+                          return false;
+                        }
+                        return true;
+                      } catch (e) {
+                        return true;
+                      }
+                    }).map(oo => {
+                      try {
+                        const validFrom = format(parseISO(oo.valid_from), 'MMM d, yyyy');
+                        const validUntil = format(parseISO(oo.valid_until), 'MMM d, yyyy');
+                        return (
+                          <SelectItem key={oo.id} value={oo.id} className="whitespace-normal break-words py-3 leading-tight border-b last:border-0 border-muted">
+                            <span className="font-medium text-blue-700 block mb-0.5">{oo.memo_number ? `${oo.memo_number}` : 'MEMO'}</span>
+                            <span className="block">{oo.subject}</span>
+                            <span className="text-xs text-muted-foreground block mt-1">({validFrom} - {validUntil})</span>
+                          </SelectItem>
+                        );
+                      } catch (e) {
+                        return (
+                          <SelectItem key={oo.id} value={oo.id} className="whitespace-normal break-words py-3 border-b last:border-0 border-muted">
+                            {oo.memo_number ? `${oo.memo_number} - ` : ''}{oo.subject}
+                          </SelectItem>
+                        );
+                      }
+                    })}
+                  </SelectContent>
+                </Select>
                 {officeOrders.length === 0 && (
                   <p className="text-xs text-red-500">You do not have any active Office Orders assigned to you.</p>
                 )}
@@ -827,9 +866,10 @@ export default function CTOPage() {
                         step="0.5"
                         min="0.5"
                         required 
-                        placeholder={isSpecialDay ? "e.g. 4 or 8 or use quick buttons above" : "e.g. 4.5"}
+                        readOnly
+                        className="bg-muted cursor-not-allowed"
+                        placeholder={isSpecialDay ? "Use quick buttons above" : "Auto-calculated from Start/End time"}
                         value={formData.hours}
-                        onChange={(e) => setFormData({...formData, hours: e.target.value})}
                       />
                     </div>
 
@@ -875,7 +915,11 @@ export default function CTOPage() {
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Submitting Request..." : "Submit Request"}
+                {isSubmitting ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting Request...</>
+                ) : (
+                  "Submit Request"
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -931,16 +975,22 @@ export default function CTOPage() {
                       disabled={isSubmitting}
                       onClick={() => handleReview("rejected")}
                     >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Reject
+                      {isSubmitting ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Rejecting...</>
+                      ) : (
+                        <><XCircle className="w-4 h-4 mr-2" /> Reject</>
+                      )}
                     </Button>
                     <Button 
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                       disabled={isSubmitting}
                       onClick={() => handleReview("approved")}
                     >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Approve
+                      {isSubmitting ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Approving...</>
+                      ) : (
+                        <><CheckCircle2 className="w-4 h-4 mr-2" /> Approve</>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -973,16 +1023,22 @@ export default function CTOPage() {
                     disabled={isSubmitting}
                     onClick={() => handleBulkReview("rejected")}
                   >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Reject All
+                    {isSubmitting ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Rejecting...</>
+                    ) : (
+                      <><XCircle className="w-4 h-4 mr-2" /> Reject All</>
+                    )}
                   </Button>
                   <Button 
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                     disabled={isSubmitting}
                     onClick={() => handleBulkReview("approved")}
                   >
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Approve All
+                    {isSubmitting ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Approving...</>
+                    ) : (
+                      <><CheckCircle2 className="w-4 h-4 mr-2" /> Approve All</>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1098,31 +1154,29 @@ export default function CTOPage() {
                     onChange={(e) => setOfficeOrderForm({...officeOrderForm, subject: e.target.value})}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>Valid From <span className="text-red-500">*</span></Label>
-                    <Input 
-                      type="date"
-                      value={officeOrderForm.valid_from}
-                      onChange={(e) => setOfficeOrderForm({...officeOrderForm, valid_from: e.target.value})}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Valid Until <span className="text-red-500">*</span></Label>
-                    <Input 
-                      type="date"
-                      value={officeOrderForm.valid_until}
-                      onChange={(e) => setOfficeOrderForm({...officeOrderForm, valid_until: e.target.value})}
-                    />
-                  </div>
-                </div>
                 <div className="grid gap-2">
-                  <Label>Date Issued</Label>
+                  <Label>Date Issued <span className="text-red-500">*</span></Label>
                   <Input 
                     type="date"
+                    required
                     value={officeOrderForm.date_issued}
-                    onChange={(e) => setOfficeOrderForm({...officeOrderForm, date_issued: e.target.value})}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      let newValidUntil = '';
+                      if (newDate) {
+                        try {
+                          newValidUntil = format(addMonths(parseISO(newDate), 12), 'yyyy-MM-dd');
+                        } catch (err) {}
+                      }
+                      setOfficeOrderForm({
+                        ...officeOrderForm, 
+                        date_issued: newDate,
+                        valid_from: newDate,
+                        valid_until: newValidUntil
+                      });
+                    }}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">Valid From and Valid Until are automatically set to 1 year from the Date Issued.</p>
                 </div>
                 <div className="grid gap-2">
                   <Label>Authorized Employees <span className="text-red-500">*</span></Label>
@@ -1172,7 +1226,11 @@ export default function CTOPage() {
                     </Button>
                   )}
                   <Button onClick={handleOfficeOrderSubmit} disabled={isSubmitting}>
-                    {editingOfficeOrder ? 'Save Changes' : 'Create Office Order'}
+                    {isSubmitting ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                    ) : (
+                      editingOfficeOrder ? 'Save Changes' : 'Create Office Order'
+                    )}
                   </Button>
                 </div>
               </CardContent>

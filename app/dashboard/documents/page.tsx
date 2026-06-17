@@ -19,7 +19,8 @@ import {
   FileSpreadsheet,
   Plus,
   ArrowLeft,
-  Edit2
+  Edit2,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -444,7 +445,11 @@ export default function DocumentsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewFolderOpen(false)} disabled={isSubmittingFolder}>Cancel</Button>
             <Button onClick={handleCreateFolder} disabled={isSubmittingFolder} className="bg-blue-600 hover:bg-blue-700 text-white">
-              {isSubmittingFolder ? "Creating..." : "Create"}
+              {isSubmittingFolder ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</>
+              ) : (
+                "Create"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -470,7 +475,11 @@ export default function DocumentsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={isSubmittingRename}>Cancel</Button>
             <Button onClick={handleRename} disabled={isSubmittingRename} className="bg-blue-600 hover:bg-blue-700 text-white">
-              {isSubmittingRename ? "Renaming..." : "Rename"}
+              {isSubmittingRename ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Renaming...</>
+              ) : (
+                "Rename"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

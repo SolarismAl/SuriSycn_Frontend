@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, GripVertical, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Plus, GripVertical, CheckCircle2, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/axios";
@@ -370,7 +370,11 @@ export default function TasksPage() {
           <DialogFooter>
             <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>Cancel</Button>
             <Button onClick={handleSaveTask} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {isSubmitting ? "Saving Task..." : "Save Task"}
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving Task...</>
+              ) : (
+                "Save Task"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

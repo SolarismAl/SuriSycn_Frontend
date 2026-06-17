@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2 } from "lucide-react";
 
 // --- Skeleton helpers ---
 function SkeletonBlock({ className }: { className?: string }) {
@@ -573,7 +573,11 @@ export default function DashboardPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsModalOpen(false); resetAnnouncementForm(); }} disabled={isSubmitting} className="rounded-xl">Cancel</Button>
             <Button onClick={handleSaveAnnouncement} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-              {isSubmitting ? (editingAnnouncementId ? "Updating..." : "Posting...") : (editingAnnouncementId ? "Update Announcement" : "Post Announcement")}
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {editingAnnouncementId ? "Updating..." : "Posting..."}</>
+              ) : (
+                editingAnnouncementId ? "Update Announcement" : "Post Announcement"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -590,7 +594,11 @@ export default function DashboardPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isSubmitting} className="rounded-xl">Cancel</Button>
             <Button onClick={handleConfirmDelete} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white rounded-xl">
-              {isSubmitting ? "Deleting..." : "Delete"}
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting...</>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
