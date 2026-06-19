@@ -114,9 +114,11 @@ export default function CTOPage() {
     }
   }, [user]);
 
+  const [activeTab, setActiveTab] = useState<"earned" | "used">("used");
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedUserId]);
+  }, [selectedUserId, activeTab]);
   useEffect(() => {
     if (isAdminOrManager) {
       api.get("/users").then(res => setUsers(res.data.data)).catch(console.error);
@@ -358,9 +360,11 @@ export default function CTOPage() {
     }
   };
 
+  const filteredEntries = entries.filter((entry: CtoEntry) => entry.type === activeTab);
+
   const ITEMS_PER_PAGE = 10;
-  const totalPages = Math.ceil(entries.length / ITEMS_PER_PAGE);
-  const paginatedEntries = entries.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredEntries.length / ITEMS_PER_PAGE);
+  const paginatedEntries = filteredEntries.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -493,18 +497,33 @@ export default function CTOPage() {
 
       {/* History Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle>History & Requests</CardTitle>
-          {isAdminOrManager && selectedIds.length > 0 && (
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex bg-muted p-1 rounded-md">
+
+              <button
+                className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-all ${activeTab === 'used' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setActiveTab('used')}
+              >
+                Time Off
+              </button>
+              <button
+                className={`px-3 py-1.5 text-sm font-medium rounded-sm transition-all ${activeTab === 'earned' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setActiveTab('earned')}
+              >
+                Log Overtime
+              </button>
+            </div>
+            {isAdminOrManager && selectedIds.length > 0 && (
               <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => { setReviewNotes(""); setIsBulkReviewModalOpen(true); }}>
                 Bulk Approve ({selectedIds.length})
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          {entries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No CTO logs or requests found.
             </div>
@@ -518,10 +537,10 @@ export default function CTOPage() {
                         <input 
                           type="checkbox" 
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={entries.filter(e => e.status === 'pending').length > 0 && selectedIds.length === entries.filter(e => e.status === 'pending').length}
+                          checked={filteredEntries.filter((e: CtoEntry) => e.status === 'pending').length > 0 && selectedIds.length === filteredEntries.filter((e: CtoEntry) => e.status === 'pending').length}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedIds(entries.filter(e => e.status === 'pending').map(e => e.id));
+                              setSelectedIds(filteredEntries.filter((e: CtoEntry) => e.status === 'pending').map((e: CtoEntry) => e.id));
                             } else {
                               setSelectedIds([]);
                             }
@@ -616,11 +635,11 @@ export default function CTOPage() {
             </div>
           )}
           
-          {totalPages > 1 && entries.length > 0 && (
+          {totalPages > 1 && filteredEntries.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between border-t border-muted/50 px-2 py-3 sm:px-6 mt-2 rounded-md bg-muted/10 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground text-center sm:text-left">
-                  Showing <span className="font-medium text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, entries.length)}</span> of <span className="font-medium text-foreground">{entries.length}</span> results
+                  Showing <span className="font-medium text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)}</span> of <span className="font-medium text-foreground">{filteredEntries.length}</span> results
                 </p>
               </div>
               <div>
