@@ -432,7 +432,10 @@ export default function CTOPage() {
               {balance.map(b => (
                 <div key={b.id} className="flex justify-between items-center p-4 bg-muted/30 rounded-lg border">
                   <span className="font-medium truncate">{b.name}</span>
-                  <Badge variant="secondary" className="bg-blue-50 text-blue-700 whitespace-nowrap">{b.available_balance} hrs</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant="secondary" className="bg-blue-50 text-blue-700 whitespace-nowrap">{b.available_balance} hrs</Badge>
+                    <span className="text-[10px] text-muted-foreground">{(Number(b.available_balance) / 8).toFixed(2)} days</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -447,6 +450,7 @@ export default function CTOPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{!Array.isArray(balance) ? balance?.available_balance || "0" : "0"} <span className="text-sm font-normal text-muted-foreground">hrs</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{!Array.isArray(balance) && balance?.available_balance ? (Number(balance.available_balance) / 8).toFixed(2) : "0"} days</p>
             </CardContent>
           </Card>
           <Card>
@@ -456,9 +460,10 @@ export default function CTOPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{!Array.isArray(balance) ? balance?.total_earned || "0" : "0"} <span className="text-sm font-normal text-muted-foreground">hrs</span></div>
-              {!Array.isArray(balance) && Number(balance?.pending_earned) > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">+{balance?.pending_earned} pending</p>
-              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                {!Array.isArray(balance) && balance?.total_earned ? (Number(balance.total_earned) / 8).toFixed(2) : "0"} days
+                {!Array.isArray(balance) && Number(balance?.pending_earned) > 0 && ` (+${balance?.pending_earned} hrs pending)`}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -468,9 +473,10 @@ export default function CTOPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{!Array.isArray(balance) ? balance?.total_used || "0" : "0"} <span className="text-sm font-normal text-muted-foreground">hrs</span></div>
-              {!Array.isArray(balance) && Number(balance?.pending_used) > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">+{balance?.pending_used} pending</p>
-              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                {!Array.isArray(balance) && balance?.total_used ? (Number(balance.total_used) / 8).toFixed(2) : "0"} days
+                {!Array.isArray(balance) && Number(balance?.pending_used) > 0 && ` (+${balance?.pending_used} hrs pending)`}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -560,12 +566,28 @@ export default function CTOPage() {
                       <td className="px-4 py-3 align-top">{getTypeBadge(entry.type)}</td>
                       <td className="px-4 py-3 font-medium align-top">{entry.hours}</td>
                       <td className="px-4 py-3 max-w-[300px] whitespace-normal break-words leading-relaxed align-top" title={entry.reason}>
-                        {entry.office_order && (
-                          <Badge variant="outline" className="mr-2 bg-muted/50 font-mono text-[10px]" title={entry.office_order.subject}>
-                            {entry.office_order.memo_number || 'MEMO'}
-                          </Badge>
+                        {entry.type === 'used' ? (
+                          <div className="flex flex-col gap-1.5">
+                            {entry.office_order && (
+                              <div className="leading-tight">
+                                <Badge variant="outline" className="mr-1.5 mb-1 bg-muted/50 font-mono text-[10px]" title={entry.office_order.subject}>
+                                  {entry.office_order.memo_number || 'MEMO'}
+                                </Badge>
+                                <span className="text-xs font-medium text-slate-700">{entry.office_order.subject}</span>
+                              </div>
+                            )}
+                            <div className="text-sm p-2 border rounded-md bg-muted/20">{entry.reason}</div>
+                          </div>
+                        ) : (
+                          <>
+                            {entry.office_order && (
+                              <Badge variant="outline" className="mr-2 bg-muted/50 font-mono text-[10px]" title={entry.office_order.subject}>
+                                {entry.office_order.memo_number || 'MEMO'}
+                              </Badge>
+                            )}
+                            {entry.reason}
+                          </>
                         )}
-                        {entry.reason}
                       </td>
                       <td className="px-4 py-3 align-top">{getStatusBadge(entry.status)}</td>
                       {isAdminOrManager && (
@@ -953,9 +975,17 @@ export default function CTOPage() {
                       <span className="text-muted-foreground block text-xs">Hours</span>
                       <span className="font-medium">{selectedEntry.hours} hrs</span>
                     </div>
+                    {selectedEntry.office_order && selectedEntry.type === 'used' && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground block text-xs">Office Order</span>
+                        <p className="mt-1 font-medium text-blue-700">
+                          {selectedEntry.office_order.memo_number ? `${selectedEntry.office_order.memo_number} - ` : ''}{selectedEntry.office_order.subject}
+                        </p>
+                      </div>
+                    )}
                     <div className="col-span-2">
                       <span className="text-muted-foreground block text-xs">Reason</span>
-                      <p className="mt-1">{selectedEntry.reason}</p>
+                      <p className="mt-1 p-3 border rounded-md bg-muted/20">{selectedEntry.reason}</p>
                     </div>
                   </div>
 
