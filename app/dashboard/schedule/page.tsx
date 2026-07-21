@@ -9,6 +9,10 @@ import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, Clock, RefreshCw, Trash2, Tag, Building2, Edit, Loader2 } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import rrulePlugin from "@fullcalendar/rrule";
+import { Download, Users, CheckCircle, XCircle, UserCheck, UserMinus, FileDown } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -52,6 +56,9 @@ export default function SchedulePage() {
             end: e.end_date,
             is_meeting: e.is_meeting,
             is_reminder: e.is_reminder,
+            department_id: e.department_id,
+            description: e.description,
+            tagged_users: e.tagged_users,
             backgroundColor: e.color || "#3b82f6",
             borderColor: e.color || "#3b82f6",
           }));
@@ -81,6 +88,7 @@ export default function SchedulePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
+  const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventTime, setNewEventTime] = useState("");
   const [newEventEndTime, setNewEventEndTime] = useState("");
   const [newEventDescription, setNewEventDescription] = useState("");
@@ -99,6 +107,52 @@ export default function SchedulePage() {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterDept, setFilterDept] = useState<string>("all");
+
+  const handleRSVP = async (status: string) => {
+    if (!selectedEvent) return;
+    try {
+      await api.post(`/events/${selectedEvent.id}/rsvp`, { status });
+      toast.success(`RSVP updated to ${status}!`);
+      // Update local state
+      const updatedEvents = events.map(ev => {
+        if (ev.id === selectedEvent.id) {
+          const updatedTaggedUsers = ev.tagged_users?.map((u: any) => {
+            if (u.id === user?.id) {
+              return { ...u, pivot: { ...u.pivot, status } };
+            }
+            return u;
+          });
+          return { ...ev, tagged_users: updatedTaggedUsers };
+        }
+        return ev;
+      });
+      setEvents(updatedEvents);
+      setSelectedEvent({ ...selectedEvent, tagged_users: selectedEvent.tagged_users.map((u: any) => u.id === user?.id ? { ...u, pivot: { ...u.pivot, status } } : u) });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update RSVP");
+    }
+  };
+
+  const handleExportICS = async () => {
+    if (!selectedEvent) return;
+    try {
+      const response = await api.get(`/events/${selectedEvent.id}/export`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `event_${selectedEvent.id}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      toast.success("Event exported to calendar!");
+    } catch (error) {
+      toast.error("Failed to export event");
+    }
+  };
+
+
   const handleDateClick = (arg: any) => {
     if (!canManageEvents) return;
     
@@ -116,6 +170,7 @@ export default function SchedulePage() {
 
     setNewEventTitle("");
     setNewEventDate(dateStr);
+    setNewEventEndDate(dateStr);
     setNewEventTime(timeStr === "00:00" ? "09:00" : timeStr);
     setNewEventEndTime(endTimeStr);
     setNewEventDescription("");
@@ -146,6 +201,7 @@ export default function SchedulePage() {
     
     setNewEventTitle(selectedEvent.title || "");
     setNewEventDate(`${year}-${month}-${day}`);
+      setNewEventEndDate(`${endObj.getFullYear()}-${String(endObj.getMonth() + 1).padStart(2, "0")}-${String(endObj.getDate()).padStart(2, "0")}`);
     setNewEventTime(`${hours}:${minutes}`);
     setNewEventEndTime(`${endHours}:${endMinutes}`);
     setNewEventDescription(selectedEvent.description || "");
@@ -171,6 +227,8 @@ export default function SchedulePage() {
     }
 
     const [year, month, day] = newEventDate.split("-").map(Number);
+    const [endYear, endMonth, endDay] = (newEventEndDate || newEventDate).split("-").map(Number);
+    
     const [hours, minutes] = newEventTime.split(":").map(Number);
     
     // If end time is not set, default to 1 hour after start
@@ -181,7 +239,7 @@ export default function SchedulePage() {
     }
 
     const start = new Date(year, month - 1, day, hours, minutes);
-    let end = new Date(year, month - 1, day, endHours, endMinutes);
+    let end = new Date(endYear, endMonth - 1, endDay, endHours, endMinutes);
     
     // If end time is before start time (e.g. crossing midnight), add 1 day to end
     if (end < start) {
@@ -222,6 +280,9 @@ export default function SchedulePage() {
           end: e.end_date,
           is_meeting: e.is_meeting,
           is_reminder: e.is_reminder,
+          department_id: e.department_id,
+          description: e.description,
+          tagged_users: e.tagged_users,
           backgroundColor: e.color || "#10b981",
           borderColor: e.color || "#10b981",
         };
@@ -244,6 +305,113 @@ export default function SchedulePage() {
       setIsSaving(false);
     }
   };
+
+
+  const handleEventResize = async (arg: any) => {
+    if (!canManageEvents) {
+      arg.revert();
+      toast.error("You don't have permission to modify events.");
+      return;
+    }
+    try {
+      const payload = {
+        start_date: arg.event.start.toISOString(),
+        end_date: arg.event.end ? arg.event.end.toISOString() : arg.event.start.toISOString(),
+      };
+      await api.put(`/events/${arg.event.id}`, payload);
+      toast.success("Event resized successfully!");
+      
+      const newEvents = events.map(e => e.id === arg.event.id ? { ...e, start: payload.start_date, end: payload.end_date } : e);
+      setEvents(newEvents);
+    } catch (error: any) {
+      arg.revert();
+      toast.error(error.response?.data?.message || "Failed to update event");
+    }
+  };
+
+  const handleSelect = (arg: any) => {
+    if (!canManageEvents) return;
+    const startStr = arg.startStr;
+    const endStr = arg.endStr;
+    
+    const isAllDay = arg.allDay;
+    
+    setNewEventTitle("");
+    if (isAllDay) {
+        setNewEventDate(startStr);
+        setNewEventEndDate(startStr);
+        setNewEventTime("08:00");
+        setNewEventEndTime("17:00");
+    } else {
+        const startT = new Date(arg.start);
+        const endT = new Date(arg.end);
+        
+        const localStart = new Date(startT.getTime() - startT.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        const localEnd = new Date(endT.getTime() - endT.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        
+        setNewEventDate(localStart.split("T")[0]);
+        setNewEventEndDate(localEnd.split("T")[0]);
+        setNewEventTime(localStart.split("T")[1]);
+        setNewEventEndTime(localEnd.split("T")[1]);
+    }
+    
+    setNewEventDescription("");
+    setNewEventRecurrence("none");
+    setNewEventColor("#3b82f6");
+    setNewEventDepartmentId("");
+    setNewEventTaggedUsers([]);
+    setNewEventExternalParticipants("");
+    setEventType("event");
+    setEditingEventId(null);
+    setIsModalOpen(true);
+    calendarRef.current?.getApi().unselect();
+  };
+
+  const renderEventContent = (eventInfo: any) => {
+    const isMeeting = eventInfo.event.extendedProps.is_meeting;
+    const isReminder = eventInfo.event.extendedProps.is_reminder;
+    const deptId = eventInfo.event.extendedProps.department_id;
+    const dept = departments.find(d => d.id === deptId)?.name;
+    
+    return (
+      <Tooltip.Provider delayDuration={300}>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <div className="flex flex-col w-full h-full p-1 overflow-hidden">
+              <div className="flex items-center gap-1 font-semibold text-xs truncate">
+                {isMeeting && <Users className="w-3 h-3 flex-shrink-0" />}
+                {isReminder && <Clock className="w-3 h-3 flex-shrink-0" />}
+                {!isMeeting && !isReminder && <Calendar className="w-3 h-3 flex-shrink-0" />}
+                <span className="truncate">{eventInfo.event.title}</span>
+              </div>
+              {dept && <div className="text-[10px] opacity-80 truncate">{dept}</div>}
+              {eventInfo.timeText && <div className="text-[10px] opacity-75">{eventInfo.timeText}</div>}
+            </div>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content className="z-50 max-w-xs rounded-lg bg-black/90 p-3 text-sm text-white shadow-xl dark:bg-white/90 dark:text-black" sideOffset={5}>
+               <p className="font-semibold mb-1">{eventInfo.event.title}</p>
+               <p className="text-xs opacity-80">{eventInfo.timeText}</p>
+               {eventInfo.event.extendedProps.description && (
+                  <p className="text-xs mt-2 opacity-90 line-clamp-3">{eventInfo.event.extendedProps.description}</p>
+               )}
+               <Tooltip.Arrow className="fill-black/90 dark:fill-white/90" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
+    );
+  };
+  
+  const filteredEvents = events.filter(ev => {
+    if (filterType === "meetings" && !ev.is_meeting) return false;
+    if (filterType === "reminders" && !ev.is_reminder) return false;
+    if (filterType === "events" && (ev.is_meeting || ev.is_reminder)) return false;
+    if (filterDept !== "all" && ev.department_id !== filterDept) return false;
+    return true;
+  });
+  
+  const upcomingEvents = [...events].filter(ev => new Date(ev.start) > new Date()).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()).slice(0, 5);
 
   const handleEventDrop = async (arg: any) => {
     if (!canManageEvents) {
@@ -337,11 +505,64 @@ export default function SchedulePage() {
         </motion.div>
       </div>
 
-      <motion.div
+      
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+        <div className="w-full lg:w-64 flex-shrink-0 flex flex-col gap-6">
+          <Card className="p-4 border-black/5 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl shadow-sm rounded-2xl">
+            <h3 className="font-semibold mb-4 text-sm tracking-tight flex items-center gap-2">
+              <Calendar className="w-4 h-4" /> Filters
+            </h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Type</Label>
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm dark:bg-black">
+                  <option value="all">All Events</option>
+                  <option value="events">Events</option>
+                  <option value="meetings">Meetings</option>
+                  <option value="reminders">Reminders</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Department</Label>
+                <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm dark:bg-black">
+                  <option value="all">All Departments</option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4 border-black/5 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl shadow-sm rounded-2xl">
+            <h3 className="font-semibold mb-4 text-sm tracking-tight flex items-center gap-2">
+              <Clock className="w-4 h-4" /> Upcoming Agenda
+            </h3>
+            <div className="flex flex-col gap-3">
+              {upcomingEvents.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No upcoming events.</p>
+              ) : (
+                upcomingEvents.map(ev => (
+                  <div key={ev.id} onClick={() => handleEventClick({ event: ev })} className="flex flex-col gap-1 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-black/5 dark:hover:border-white/5">
+                    <div className="flex items-center gap-1.5 font-medium text-sm">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ev.backgroundColor }}></div>
+                      <span className="truncate">{ev.title}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground pl-3.5">
+                      {new Date(ev.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="flex-1 min-h-[600px]"
+        className="flex-1 w-full min-h-[600px] max-w-full lg:max-w-[calc(100%-17rem)]"
       >
         <Card className="p-4 md:p-6 border-black/5 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-3xl shadow-sm rounded-2xl [&_.fc-theme-standard]:border-black/5 dark:[&_.fc-theme-standard]:border-white/5 [&_.fc-col-header-cell]:py-2 [&_.fc-col-header-cell]:font-medium dark:[&_th.fc-col-header-cell]:!bg-transparent dark:[&_.fc-theme-standard_th]:!bg-transparent [&_.fc-day-today]:!bg-blue-500/10 dark:[&_.fc-day-today]:!bg-blue-500/20 overflow-hidden dark:[&_.fc-col-header-cell-cushion]:!text-zinc-100 dark:[&_.fc-daygrid-day-number]:!text-zinc-100 dark:[&_.fc-toolbar-title]:!text-zinc-100 dark:[&_th]:!border-white/5 [&_td.fc-day]:!bg-white/90 dark:[&_td.fc-day]:!bg-white/10 [&_td.fc-day-other]:!bg-black/5 dark:[&_td.fc-day-other]:!bg-transparent [&_.fc-daygrid-day-top]:flex [&_.fc-daygrid-day-top]:justify-end [&_.fc-daygrid-day-top]:p-1 [&_.fc-daygrid-day-events]:p-1 [&_td.fc-day-today]:!bg-blue-500/20 dark:[&_td.fc-day-today]:!bg-blue-500/30 [&_.fc-event]:!border-dashed [&_.fc-event]:!border-2 [&_.fc-event-main]:p-1 [&_.fc-event-main-frame]:!items-start [&_.fc-event-time]:!mr-1 [&_.fc-event-title]:!whitespace-normal [&_.fc-event-title]:!break-words [&_.fc-event-title]:!font-normal">
           {isLoading ? (
@@ -374,19 +595,22 @@ export default function SchedulePage() {
           ) : (
             <FullCalendar
               ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
               initialView="dayGridMonth"
               headerToolbar={{
                 left: "prev,next today",
                 center: "title",
                 right: "dayGridMonth,timeGridWeek,timeGridDay",
               }}
-              events={events}
+              events={filteredEvents}
               editable={canManageEvents}
               selectable={true}
               selectMirror={true}
               dayMaxEvents={true}
               weekends={true}
+              select={handleSelect}
+              eventResize={handleEventResize}
+              eventContent={renderEventContent}
               dateClick={handleDateClick}
               eventClick={handleEventClick}
               eventDrop={handleEventDrop}
@@ -408,9 +632,10 @@ export default function SchedulePage() {
           )}
         </Card>
       </motion.div>
+      </div>
 
       <Dialog open={isModalOpen} onOpenChange={(open) => { setIsModalOpen(open); if (!open) setEditingEventId(null); }}>
-        <DialogContent className="sm:max-w-[650px]">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingEventId ? "Edit Event" : "Add New Event"}</DialogTitle>
             <DialogDescription>
@@ -466,19 +691,30 @@ export default function SchedulePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="grid gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid gap-2 col-span-2">
                 <Label htmlFor="date">
-                  Date <span className="text-destructive">*</span>
+                  Start Date <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="date"
                   type="date"
                   value={newEventDate}
-                  onChange={(e) => setNewEventDate(e.target.value)}
+                  onChange={(e) => { setNewEventDate(e.target.value); if(!newEventEndDate) setNewEventEndDate(e.target.value); }}
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 col-span-2">
+                <Label htmlFor="enddate">
+                  End Date
+                </Label>
+                <Input
+                  id="enddate"
+                  type="date"
+                  value={newEventEndDate}
+                  onChange={(e) => setNewEventEndDate(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2 col-span-2">
                 <Label htmlFor="time">
                   Start Time <span className="text-destructive">*</span>
                 </Label>
@@ -489,7 +725,7 @@ export default function SchedulePage() {
                   onChange={(e) => setNewEventTime(e.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 col-span-2">
                 <Label htmlFor="endtime">
                   End Time <span className="text-destructive">*</span>
                 </Label>
@@ -667,29 +903,40 @@ export default function SchedulePage() {
               </div>
             )}
 
-            <div className="flex gap-3 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium">Start</p>
-                <p className="text-muted-foreground">
-                  {selectedEvent?.start_date
-                    ? new Date(selectedEvent.start_date).toLocaleString()
-                    : "—"}
-                </p>
-              </div>
-            </div>
+            {(() => {
+              if (!selectedEvent?.start_date || !selectedEvent?.end_date) return null;
+              const start = new Date(selectedEvent.start_date);
+              const end = new Date(selectedEvent.end_date);
+              
+              const startDateStr = start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+              const endDateStr = end.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+              const startTimeStr = start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+              const endTimeStr = end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
-            <div className="flex gap-3 text-sm">
-              <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium">End</p>
-                <p className="text-muted-foreground">
-                  {selectedEvent?.end_date
-                    ? new Date(selectedEvent.end_date).toLocaleString()
-                    : "—"}
-                </p>
-              </div>
-            </div>
+              return (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex gap-3 text-sm">
+                    <Calendar className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Date</p>
+                      <p className="text-muted-foreground">
+                        {startDateStr === endDateStr ? startDateStr : `${startDateStr} to ${endDateStr}`}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3 text-sm">
+                    <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Time</p>
+                      <p className="text-muted-foreground">
+                        {startTimeStr} - {endTimeStr}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {selectedEvent?.recurrence && selectedEvent.recurrence !== "none" && (
               <div className="flex gap-3 text-sm">
@@ -713,11 +960,37 @@ export default function SchedulePage() {
               </div>
             )}
 
+            
+            {selectedEvent?.tagged_users && selectedEvent.tagged_users.length > 0 && (
+                <div className="flex gap-3 text-sm border-t pt-4 mt-2 border-black/5 dark:border-white/10">
+                  <UserCheck className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="w-full">
+                    <p className="font-medium mb-2">My RSVP</p>
+                    {(() => {
+                      const myTag = selectedEvent.tagged_users.find((u: any) => u.id === user?.id);
+                      if (!myTag) return <p className="text-xs text-muted-foreground">You are not invited.</p>;
+                      
+                      const status = myTag.pivot?.status || 'pending';
+                      return (
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant={status === 'going' ? 'default' : 'outline'} className={status === 'going' ? 'bg-green-600 hover:bg-green-700 text-white' : ''} onClick={() => handleRSVP('going')}>
+                            <CheckCircle className="w-4 h-4 mr-2" /> Going
+                          </Button>
+                          <Button size="sm" variant={status === 'declined' ? 'default' : 'outline'} className={status === 'declined' ? 'bg-red-600 hover:bg-red-700 text-white' : ''} onClick={() => handleRSVP('declined')}>
+                            <XCircle className="w-4 h-4 mr-2" /> Declined
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+            )}
+
             {((selectedEvent?.tagged_users && selectedEvent.tagged_users.length > 0) || (selectedEvent?.external_participants && selectedEvent.external_participants.length > 0)) && (
               <div className="flex gap-3 text-sm border-t pt-4 mt-2 border-black/5 dark:border-white/10">
                 <Tag className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="w-full">
-                  <p className="font-medium mb-2">Participants</p>
+                  <p className="font-medium mb-2">Participants (Invited Users)</p>
                   
                   {selectedEvent?.tagged_users && selectedEvent.tagged_users.length > 0 && (
                     <div className="mb-3">
@@ -728,7 +1001,10 @@ export default function SchedulePage() {
                             <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 flex items-center justify-center text-xs font-medium">
                               {user.first_name?.charAt(0)}{user.last_name?.charAt(0)}
                             </div>
-                            <span className="text-sm">{user.first_name} {user.last_name}</span>
+                            <span className="text-sm flex-1">{user.first_name} {user.last_name}</span>
+                            {user.pivot?.status === 'going' && <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Going</span>}
+                            {user.pivot?.status === 'declined' && <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Declined</span>}
+                            {(user.pivot?.status === 'pending' || !user.pivot?.status) && <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400">Pending</span>}
                           </div>
                         ))}
                       </div>
@@ -771,6 +1047,7 @@ export default function SchedulePage() {
               </div>
             ) : (
               <>
+                <Button variant="outline" onClick={handleExportICS} className="gap-2"><FileDown className="w-4 h-4" /> Export (.ics)</Button>
                 <Button variant="outline" onClick={handleEditClick} className="gap-2">
                   <Edit className="w-4 h-4" />
                   Edit

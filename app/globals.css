@@ -127,3 +127,11 @@
     @apply font-sans;
     }
 }
+/* Make multi-day events look like Gantt chart blocks */
+.fc-daygrid-event {
+  min-height: 38px !important;
+  display: flex !important;
+  align-items: center;
+  padding: 4px 6px !important;
+}
+
